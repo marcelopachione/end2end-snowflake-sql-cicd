@@ -1,15 +1,13 @@
-USE DATABASE snowDB;
-
 -- Create procedure to load data from S3 to bronze_customers table
-CREATE OR REPLACE PROCEDURE sp_load_bronze_customers()
+CREATE OR REPLACE PROCEDURE snowDB.dev.sp_load_bronze_customers()
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    TRUNCATE TABLE bronze_customers;
+    TRUNCATE TABLE snowDB.dev.bronze_customers;
 
-    INSERT INTO bronze_customers
+    INSERT INTO snowDB.dev.bronze_customers
         SELECT 
             CAST($1 AS VARIANT) as raw,
             metadata$filename as filename,                     

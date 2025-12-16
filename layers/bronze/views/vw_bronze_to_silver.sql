@@ -1,5 +1,3 @@
-USE DATABASE snowDB;
-
 SELECT 
         COALESCE(UPPER($1:"customer_id"::string),'N/A') as customer_id,
         COALESCE(UPPER($1:"company_name"::string),'N/A') as company_name,
@@ -12,4 +10,4 @@ SELECT
         COALESCE(UPPER($1:"phone"::string),'N/A') as phone,
         COALESCE(UPPER($1:"fax"::string),'N/A') as fax,
         current_timestamp as created_at
-    FROM bronze_customers;
+    FROM snowDB.dev.bronze_customers;

@@ -1,7 +1,5 @@
-USE DATABASE snowDB;
-
 -- Create silver table customers
-CREATE TABLE IF NOT EXISTS silver_customers (
+CREATE TABLE IF NOT EXISTS snowDB.dev.silver_customers (
   customer_id   STRING,
   company_name  STRING,
   contact_name  STRING,
