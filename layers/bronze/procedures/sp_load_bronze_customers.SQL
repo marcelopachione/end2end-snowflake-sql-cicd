@@ -17,5 +17,6 @@ BEGIN
 END;
 $$;
 
+
 -- Execute the procedure
 -- CALL sp_load_bronze_customers();

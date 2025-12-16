@@ -1,6 +1,3 @@
-USE DATABASE snowDB;
-USE SCHEMA DEV;
-
 -- Create silver table customers
 CREATE TABLE IF NOT EXISTS silver_customers (
   customer_id   STRING,
