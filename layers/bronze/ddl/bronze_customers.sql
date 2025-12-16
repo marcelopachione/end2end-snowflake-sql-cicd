@@ -1,5 +1,5 @@
 USE DATABASE snowDB;
-USE SCHEMA DEV
+USE SCHEMA DEV;
 
 -- Create bronze table customer
 CREATE TABLE IF NOT EXISTS bronze_customers (
