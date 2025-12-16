@@ -1,3 +1,5 @@
+USE DATABASE snowDB;
+
 -- Create procedure to load data from bronze_customers table to silver_customers table
 CREATE OR REPLACE PROCEDURE sp_load_silver_customers()
 RETURNS STRING

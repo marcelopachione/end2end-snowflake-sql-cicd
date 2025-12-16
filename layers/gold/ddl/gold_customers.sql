@@ -1,3 +1,5 @@
+USE DATABASE snowDB;
+
 -- Create gold table customers
 CREATE TABLE IF NOT EXISTS gold_dim_customers (
     customer_sk BIGINT AUTOINCREMENT,

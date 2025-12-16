@@ -1,3 +1,5 @@
+USE DATABASE snowDB;
+
 -- Task Silver
 CREATE OR REPLACE TASK task_load_silver_customers
   WAREHOUSE = COMPUTE_WH
