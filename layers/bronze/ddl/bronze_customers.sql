@@ -1,3 +1,5 @@
+USE DATABASE snowDB;
+
 -- Create bronze table customer
 CREATE TABLE IF NOT EXISTS bronze_customers (
     raw VARIANT,           -- Raw JSON

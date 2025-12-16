@@ -1,3 +1,5 @@
+USE DATABASE snowDB;
+
 -- Create procedure to load data from S3 to bronze_customers table
 CREATE OR REPLACE PROCEDURE sp_load_bronze_customers()
 RETURNS STRING
