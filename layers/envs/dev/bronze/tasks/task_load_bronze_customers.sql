@@ -1,9 +1,9 @@
 -- Task Bronze
-CREATE OR REPLACE TASK task_load_bronze_customers
+CREATE OR REPLACE TASK snowDB.dev.task_load_bronze_customers
   WAREHOUSE = COMPUTE_WH
   SCHEDULE = 'USING CRON */5 * * * * Europe/Dublin' -- every 5 minutes
 AS
-  CALL sp_load_bronze_customers();
+  CALL snowDB.dev.sp_load_bronze_customers();
 
 -- Enable the task
 -- ALTER TASK task_load_bronze_customers RESUME;
