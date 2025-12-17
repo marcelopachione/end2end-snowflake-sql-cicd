@@ -8,8 +8,8 @@ CREATE STAGE IF NOT EXISTS North
   CREDENTIALS = (
     -- AWS_KEY_ID     = '&{SNOWSQL_AWS_KEY_ID}'        -- Nomes alinhados aos -D do CI
     -- AWS_SECRET_KEY = '&{SNOWSQL_AWS_SECRET_KEY}'
-    AWS_KEY_ID     = 'SNOWSQL_AWS_KEY_ID'        -- Nomes alinhados aos -D do CI
-    AWS_SECRET_KEY = 'SNOWSQL_AWS_KEY_ID'
+    AWS_KEY_ID     = '$SNOWSQL_AWS_KEY_ID'        -- Nomes alinhados aos -D do CI
+    AWS_SECRET_KEY = '$SNOWSQL_AWS_SECRET_KEY'
   )
   DIRECTORY = (ENABLE = TRUE)
   COMMENT = 'Project - end2end-snowflake-sql-cicd';
