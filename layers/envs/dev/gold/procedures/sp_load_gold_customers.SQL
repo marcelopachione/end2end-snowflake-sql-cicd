@@ -1,5 +1,5 @@
 -- Create procedure to load data from bronze_customers table to silver_customers table
-CREATE OR REPLACE PROCEDURE snowDB.dev.sp_load_gold_dim_customers()
+CREATE OR REPLACE PROCEDURE sp_load_gold_dim_customers()
 RETURNS VARCHAR
 LANGUAGE SQL
 AS
@@ -8,7 +8,7 @@ $$
 BEGIN
 
     -- MERGE da dim de customers
-    MERGE INTO snowDB.dev.gold_dim_customers g
+    MERGE INTO gold_dim_customers g
     USING (
         SELECT
             customer_id,
@@ -32,7 +32,7 @@ BEGIN
                 NVL(phone,'')         || '|' ||
                 NVL(fax,'')
             ) AS hash_diff
-        FROM snowDB.dev.silver_customers
+        FROM silver_customers
     ) s
     ON g.customer_id = s.customer_id
 

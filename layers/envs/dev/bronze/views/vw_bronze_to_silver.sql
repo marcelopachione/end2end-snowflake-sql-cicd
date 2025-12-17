@@ -10,4 +10,4 @@ SELECT
         COALESCE(UPPER($1:"phone"::string),'N/A') as phone,
         COALESCE(UPPER($1:"fax"::string),'N/A') as fax,
         current_timestamp as created_at
-    FROM snowDB.dev.bronze_customers;
+    FROM bronze_customers;
