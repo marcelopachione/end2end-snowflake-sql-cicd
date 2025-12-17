@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Descobrir arquivos .sql alterados
+          # List changed .sql files
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
             MODIFIED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.sql$' || true)
           else
@@ -56,32 +56,25 @@ jobs:
             exit 0
           fi
 
-          # Fase 1: migrations/database/*.sql (ordem alfabética estável)
+          # Phase 1: migrations/database/*.sql
           PHASE1=$(echo "$MODIFIED_FILES" | grep -E '^migrations/database/.*\.sql$' | sort || true)
 
-          # Fase 2: migrations/snowflake/*.sql (ordem alfabética estável)
+          # Phase 2: migrations/snowflake/*.sql
           PHASE2=$(echo "$MODIFIED_FILES" | grep -E '^migrations/snowflake/.*\.sql$' | sort || true)
 
-          # Fase 3: Medallion layers/** (bronze -> silver -> gold; tasks por último)
+          # Phase 3: Medallion layers ordered: bronze -> silver -> gold, tasks last
           MEDALLION=$(echo "$MODIFIED_FILES" | grep -E '^layers/(bronze|silver|gold)/.*\.sql$' || true)
           PHASE3=$(echo "$MEDALLION" | while read -r file; do
-            if [[ -z "$file" ]]; then continue; fi
-            if [[ "$file" == *"/tasks/"* ]]; then
-              echo "4:$file"
-            elif [[ "$file" == layers/bronze/* ]]; then
-              echo "1:$file"
-            elif [[ "$file" == layers/silver/* ]]; then
-              echo "2:$file"
-            elif [[ "$file" == layers/gold/* ]]; then
-              echo "3:$file"
-            else
-              echo "0:$file"   # fallback
-            fi
+            [ -z "$file" ] && continue
+            if   [[ "$file" == *"/tasks/"* ]];     then echo "4:$file"
+            elif [[ "$file" == layers/bronze/* ]]; then echo "1:$file"
+            elif [[ "$file" == layers/silver/* ]]; then echo "2:$file"
+            elif [[ "$file" == layers/gold/* ]];   then echo "3:$file"
+            else echo "0:$file"; fi
           done | sort -t: -k1,1n -k2 | cut -d: -f2-)
 
           run_snowsql () {
-            local schema="$1"
-            local file="$2"
+            local schema="$1"; local file="$2"
             echo "Running ${file} on schema ${schema}"
             snowsql \
               -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" \
@@ -89,15 +82,16 @@ jobs:
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -o variable_substitution=true \
               -o exit_on_error=true \
+              -o log_level=INFO \
               -f "$file" \
-              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
-              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY"
+              --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
+              --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
           }
 
-          # Executar fases em ordem; qualquer falha aborta (exit_on_error + set -euo pipefail)
-          for file in $PHASE1; do run_snowsql "DEV" "$file"; done
-          for file in $PHASE2; do run_snowsql "DEV" "$file"; done
-          for file in $PHASE3; do run_snowsql "DEV" "$file"; done
+          # Execute phases; any failure stops the job immediately.
+          for f in $PHASE1; do run_snowsql "DEV" "$f"; done
+          for f in $PHASE2; do run_snowsql "DEV" "$f"; done
+          for f in $PHASE3; do run_snowsql "DEV" "$f"; done
 
   qa:
     if: github.ref != 'refs/heads/main'
@@ -132,6 +126,7 @@ jobs:
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -euo pipefail
+
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
             MODIFIED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.sql$' || true)
           else
@@ -146,23 +141,16 @@ jobs:
           PHASE2=$(echo "$MODIFIED_FILES" | grep -E '^migrations/snowflake/.*\.sql$' | sort || true)
           MEDALLION=$(echo "$MODIFIED_FILES" | grep -E '^layers/(bronze|silver|gold)/.*\.sql$' || true)
           PHASE3=$(echo "$MEDALLION" | while read -r file; do
-            if [[ -z "$file" ]]; then continue; fi
-            if [[ "$file" == *"/tasks/"* ]]; then
-              echo "4:$file"
-            elif [[ "$file" == layers/bronze/* ]]; then
-              echo "1:$file"
-            elif [[ "$file" == layers/silver/* ]]; then
-              echo "2:$file"
-            elif [[ "$file" == layers/gold/* ]]; then
-              echo "3:$file"
-            else
-              echo "0:$file"
-            fi
+            [ -z "$file" ] && continue
+            if   [[ "$file" == *"/tasks/"* ]];     then echo "4:$file"
+            elif [[ "$file" == layers/bronze/* ]]; then echo "1:$file"
+            elif [[ "$file" == layers/silver/* ]]; then echo "2:$file"
+            elif [[ "$file" == layers/gold/* ]];   then echo "3:$file"
+            else echo "0:$file"; fi
           done | sort -t: -k1,1n -k2 | cut -d: -f2-)
 
           run_snowsql () {
-            local schema="$1"
-            local file="$2"
+            local schema="$1"; local file="$2"
             echo "Running ${file} on schema ${schema}"
             snowsql \
               -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" \
@@ -170,14 +158,15 @@ jobs:
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -o variable_substitution=true \
               -o exit_on_error=true \
+              -o log_level=INFO \
               -f "$file" \
-              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
-              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY"
+              --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
+              --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
           }
 
-          for file in $PHASE1; do run_snowsql "QA" "$file"; done
-          for file in $PHASE2; do run_snowsql "QA" "$file"; done
-          for file in $PHASE3; do run_snowsql "QA" "$file"; done
+          for f in $PHASE1; do run_snowsql "QA" "$f"; done
+          for f in $PHASE2; do run_snowsql "QA" "$f"; done
+          for f in $PHASE3; do run_snowsql "QA" "$f"; done
 
   prod:
     if: github.ref == 'refs/heads/main'
@@ -211,6 +200,7 @@ jobs:
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -euo pipefail
+
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
             MODIFIED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.sql$' || true)
           else
@@ -225,23 +215,16 @@ jobs:
           PHASE2=$(echo "$MODIFIED_FILES" | grep -E '^migrations/snowflake/.*\.sql$' | sort || true)
           MEDALLION=$(echo "$MODIFIED_FILES" | grep -E '^layers/(bronze|silver|gold)/.*\.sql$' || true)
           PHASE3=$(echo "$MEDALLION" | while read -r file; do
-            if [[ -z "$file" ]]; then continue; fi
-            if [[ "$file" == *"/tasks/"* ]]; then
-              echo "4:$file"
-            elif [[ "$file" == layers/bronze/* ]]; then
-              echo "1:$file"
-            elif [[ "$file" == layers/silver/* ]]; then
-              echo "2:$file"
-            elif [[ "$file" == layers/gold/* ]]; then
-              echo "3:$file"
-            else
-              echo "0:$file"
-            fi
+            [ -z "$file" ] && continue
+            if   [[ "$file" == *"/tasks/"* ]];     then echo "4:$file"
+            elif [[ "$file" == layers/bronze/* ]]; then echo "1:$file"
+            elif [[ "$file" == layers/silver/* ]]; then echo "2:$file"
+            elif [[ "$file" == layers/gold/* ]];   then echo "3:$file"
+            else echo "0:$file"; fi
           done | sort -t: -k1,1n -k2 | cut -d: -f2-)
 
           run_snowsql () {
-            local schema="$1"
-            local file="$2"
+            local schema="$1"; local file="$2"
             echo "Running ${file} on schema ${schema}"
             snowsql \
               -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" \
@@ -249,11 +232,12 @@ jobs:
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -o variable_substitution=true \
               -o exit_on_error=true \
+              -o log_level=INFO \
               -f "$file" \
-              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
-              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY"
+              --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
+              --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
           }
 
-          for file in $PHASE1; do run_snowsql "${{ env.SCHEMA_PRD }}" "$file"; done
-          for file in $PHASE2; do run_snowsql "${{ env.SCHEMA_PRD }}" "$file"; done
-          for file in $PHASE3; do run_snowsql "${{ env.SCHEMA_PRD }}" "$file"; done
+          for f in $PHASE1; do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $PHASE2; do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $PHASE3; do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
