@@ -1,5 +1,3 @@
-USE DATABASE snowDB;
-
 -- Create DEV schema
 CREATE SCHEMA IF NOT EXISTS DEV;
 
