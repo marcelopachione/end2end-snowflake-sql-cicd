@@ -81,7 +81,6 @@ jobs:
                   -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
                   --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
                   --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
-                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -161,7 +160,6 @@ jobs:
                   -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
                   --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
                   --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
-                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -240,7 +238,6 @@ jobs:
                   -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
                   --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
                   --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
-                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
