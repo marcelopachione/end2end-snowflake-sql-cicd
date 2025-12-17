@@ -6,8 +6,7 @@ env:
 
 on:
   push:
-    branches:
-      - '**'
+    branches: [ "**" ]
   workflow_dispatch:
 
 jobs:
@@ -43,36 +42,9 @@ jobs:
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -euo pipefail
+          shopt -s nullglob globstar
 
-          # List changed .sql files
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            MODIFIED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.sql$' || true)
-          else
-            MODIFIED_FILES=$(git show --pretty="" --name-only HEAD | grep '\.sql$' || true)
-          fi
-
-          if [ -z "${MODIFIED_FILES}" ]; then
-            echo "No .sql files changed."
-            exit 0
-          fi
-
-          # Phase 1: migrations/database/*.sql
-          PHASE1=$(echo "$MODIFIED_FILES" | grep -E '^migrations/database/.*\.sql$' | sort || true)
-
-          # Phase 2: migrations/snowflake/*.sql
-          PHASE2=$(echo "$MODIFIED_FILES" | grep -E '^migrations/snowflake/.*\.sql$' | sort || true)
-
-          # Phase 3: Medallion layers ordered: bronze -> silver -> gold, tasks last
-          MEDALLION=$(echo "$MODIFIED_FILES" | grep -E '^layers/(bronze|silver|gold)/.*\.sql$' || true)
-          PHASE3=$(echo "$MEDALLION" | while read -r file; do
-            [ -z "$file" ] && continue
-            if   [[ "$file" == *"/tasks/"* ]];     then echo "4:$file"
-            elif [[ "$file" == layers/bronze/* ]]; then echo "1:$file"
-            elif [[ "$file" == layers/silver/* ]]; then echo "2:$file"
-            elif [[ "$file" == layers/gold/* ]];   then echo "3:$file"
-            else echo "0:$file"; fi
-          done | sort -t: -k1,1n -k2 | cut -d: -f2-)
-
+          # ---------- Helpers ----------
           run_snowsql () {
             local schema="$1"; local file="$2"
             echo "Running ${file} on schema ${schema}"
@@ -88,10 +60,39 @@ jobs:
               --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
           }
 
-          # Execute phases; any failure stops the job immediately.
+          list_sorted () {
+            # prints sorted list if files exist
+            for f in "$@"; do [ -e "$f" ] && echo "$f"; done | sort
+          }
+
+          # ---------- Phase 1: migrations/database ----------
+          PHASE1=$(list_sorted migrations/database/*.sql)
           for f in $PHASE1; do run_snowsql "DEV" "$f"; done
+
+          # ---------- Phase 2: migrations/snowflake ----------
+          PHASE2=$(list_sorted migrations/snowflake/*.sql)
           for f in $PHASE2; do run_snowsql "DEV" "$f"; done
-          for f in $PHASE3; do run_snowsql "DEV" "$f"; done
+
+          # ---------- Phase 3: Medallion ----------
+          # Order inside each layer: ddl -> views -> procedures -> (others) -> tasks
+          order_layer () {
+            local layer="$1"
+            list_sorted \
+              "layers/${layer}/ddl/"*.sql \
+              "layers/${layer}/views/"*.sql \
+              "layers/${layer}/procedures/"*.sql \
+              "layers/${layer}/"*.sql
+            # tasks last
+            list_sorted "layers/${layer}/tasks/"*.sql
+          }
+
+          PHASE3_BRONZE=$(order_layer bronze)
+          PHASE3_SILVER=$(order_layer silver)
+          PHASE3_GOLD=$(order_layer gold)
+
+          for f in $PHASE3_BRONZE; do run_snowsql "DEV" "$f"; done
+          for f in $PHASE3_SILVER; do run_snowsql "DEV" "$f"; done
+          for f in $PHASE3_GOLD;   do run_snowsql "DEV" "$f"; done
 
   qa:
     if: github.ref != 'refs/heads/main'
@@ -99,23 +100,18 @@ jobs:
     needs: dev
     steps:
       - uses: actions/checkout@v3
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libaio1 libncurses6 alien
-
       - name: Download and install SnowSQL via RPM
         run: |
           wget https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.4/linux_x86_64/snowflake-snowsql-1.4.1-1.x86_64.rpm
           sudo alien -i snowflake-snowsql-1.4.1-1.x86_64.rpm
-
       - name: Add SnowSQL to PATH
         run: echo "/usr/bin" >> $GITHUB_PATH
-
       - name: Check SnowSQL installation
         run: which snowsql && snowsql -v
-
       - name: Run SQL (QA) in ordered phases
         env:
           SNOWSQL_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
@@ -126,28 +122,7 @@ jobs:
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -euo pipefail
-
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            MODIFIED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.sql$' || true)
-          else
-            MODIFIED_FILES=$(git show --pretty="" --name-only HEAD | grep '\.sql$' || true)
-          fi
-          if [ -z "${MODIFIED_FILES}" ]; then
-            echo "No .sql files changed."
-            exit 0
-          fi
-
-          PHASE1=$(echo "$MODIFIED_FILES" | grep -E '^migrations/database/.*\.sql$' | sort || true)
-          PHASE2=$(echo "$MODIFIED_FILES" | grep -E '^migrations/snowflake/.*\.sql$' | sort || true)
-          MEDALLION=$(echo "$MODIFIED_FILES" | grep -E '^layers/(bronze|silver|gold)/.*\.sql$' || true)
-          PHASE3=$(echo "$MEDALLION" | while read -r file; do
-            [ -z "$file" ] && continue
-            if   [[ "$file" == *"/tasks/"* ]];     then echo "4:$file"
-            elif [[ "$file" == layers/bronze/* ]]; then echo "1:$file"
-            elif [[ "$file" == layers/silver/* ]]; then echo "2:$file"
-            elif [[ "$file" == layers/gold/* ]];   then echo "3:$file"
-            else echo "0:$file"; fi
-          done | sort -t: -k1,1n -k2 | cut -d: -f2-)
+          shopt -s nullglob globstar
 
           run_snowsql () {
             local schema="$1"; local file="$2"
@@ -164,32 +139,40 @@ jobs:
               --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
           }
 
-          for f in $PHASE1; do run_snowsql "QA" "$f"; done
-          for f in $PHASE2; do run_snowsql "QA" "$f"; done
-          for f in $PHASE3; do run_snowsql "QA" "$f"; done
+          list_sorted () { for f in "$@"; do [ -e "$f" ] && echo "$f"; done | sort; }
+          order_layer () {
+            local layer="$1"
+            list_sorted \
+              "layers/${layer}/ddl/"*.sql \
+              "layers/${layer}/views/"*.sql \
+              "layers/${layer}/procedures/"*.sql \
+              "layers/${layer}/"*.sql
+            list_sorted "layers/${layer}/tasks/"*.sql
+          }
+
+          for f in $(list_sorted migrations/database/*.sql);   do run_snowsql "QA" "$f"; done
+          for f in $(list_sorted migrations/snowflake/*.sql);  do run_snowsql "QA" "$f"; done
+          for f in $(order_layer bronze); do run_snowsql "QA" "$f"; done
+          for f in $(order_layer silver); do run_snowsql "QA" "$f"; done
+          for f in $(order_layer gold);   do run_snowsql "QA" "$f"; done
 
   prod:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libaio1 libncurses6 alien
-
       - name: Download and install SnowSQL via RPM
         run: |
           wget https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.4/linux_x86_64/snowflake-snowsql-1.4.1-1.x86_64.rpm
           sudo alien -i snowflake-snowsql-1.4.1-1.x86_64.rpm
-
       - name: Add SnowSQL to PATH
         run: echo "/usr/bin" >> $GITHUB_PATH
-
       - name: Check SnowSQL installation
         run: which snowsql && snowsql -v
-
       - name: Run SQL (PROD) in ordered phases
         env:
           SNOWSQL_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
@@ -200,28 +183,7 @@ jobs:
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -euo pipefail
-
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            MODIFIED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.sql$' || true)
-          else
-            MODIFIED_FILES=$(git show --pretty="" --name-only HEAD | grep '\.sql$' || true)
-          fi
-          if [ -z "${MODIFIED_FILES}" ]; then
-            echo "No .sql files changed."
-            exit 0
-          fi
-
-          PHASE1=$(echo "$MODIFIED_FILES" | grep -E '^migrations/database/.*\.sql$' | sort || true)
-          PHASE2=$(echo "$MODIFIED_FILES" | grep -E '^migrations/snowflake/.*\.sql$' | sort || true)
-          MEDALLION=$(echo "$MODIFIED_FILES" | grep -E '^layers/(bronze|silver|gold)/.*\.sql$' || true)
-          PHASE3=$(echo "$MEDALLION" | while read -r file; do
-            [ -z "$file" ] && continue
-            if   [[ "$file" == *"/tasks/"* ]];     then echo "4:$file"
-            elif [[ "$file" == layers/bronze/* ]]; then echo "1:$file"
-            elif [[ "$file" == layers/silver/* ]]; then echo "2:$file"
-            elif [[ "$file" == layers/gold/* ]];   then echo "3:$file"
-            else echo "0:$file"; fi
-          done | sort -t: -k1,1n -k2 | cut -d: -f2-)
+          shopt -s nullglob globstar
 
           run_snowsql () {
             local schema="$1"; local file="$2"
@@ -238,6 +200,19 @@ jobs:
               --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
           }
 
-          for f in $PHASE1; do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
-          for f in $PHASE2; do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
-          for f in $PHASE3; do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          list_sorted () { for f in "$@"; do [ -e "$f" ] && echo "$f"; done | sort; }
+          order_layer () {
+            local layer="$1"
+            list_sorted \
+              "layers/${layer}/ddl/"*.sql \
+              "layers/${layer}/views/"*.sql \
+              "layers/${layer}/procedures/"*.sql \
+              "layers/${layer}/"*.sql
+            list_sorted "layers/${layer}/tasks/"*.sql
+          }
+
+          for f in $(list_sorted migrations/database/*.sql);   do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $(list_sorted migrations/snowflake/*.sql);  do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $(order_layer bronze); do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $(order_layer silver); do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $(order_layer gold);   do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
