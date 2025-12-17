@@ -40,14 +40,13 @@ jobs:
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
           SNOWSQL_AWS_KEY_ID: ${{ secrets.SNOWSQL_AWS_KEY_ID }}
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
+        shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob globstar
 
-          # ---------- Helpers ----------
           run_snowsql () {
             local schema="$1"; local file="$2"
-            echo "Running ${file} on schema ${schema}"
+            echo "::group::Running ${file} on schema ${schema}"
             snowsql \
               -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" \
               -d "$SNOWSQL_DB" -s "$schema" \
@@ -58,41 +57,52 @@ jobs:
               -f "$file" \
               --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
               --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
+            echo "::endgroup::"
           }
 
-          list_sorted () {
-            # prints sorted list if files exist
-            for f in "$@"; do [ -e "$f" ] && echo "$f"; done | sort
+          list_phase () { # echo sorted list if exists
+            ls -1 "$@" 2>/dev/null | sort || true
           }
 
           # ---------- Phase 1: migrations/database ----------
-          PHASE1=$(list_sorted migrations/database/*.sql)
+          PHASE1=$(list_phase migrations/database/*.sql)
+          echo "Phase1 (migrations/database) count: $(echo "$PHASE1" | wc -w || echo 0)"
           for f in $PHASE1; do run_snowsql "DEV" "$f"; done
 
           # ---------- Phase 2: migrations/snowflake ----------
-          PHASE2=$(list_sorted migrations/snowflake/*.sql)
+          PHASE2=$(list_phase migrations/snowflake/*.sql)
+          echo "Phase2 (migrations/snowflake) count: $(echo "$PHASE2" | wc -w || echo 0)"
           for f in $PHASE2; do run_snowsql "DEV" "$f"; done
 
-          # ---------- Phase 3: Medallion ----------
-          # Order inside each layer: ddl -> views -> procedures -> (others) -> tasks
-          order_layer () {
-            local layer="$1"
-            list_sorted \
-              "layers/${layer}/ddl/"*.sql \
-              "layers/${layer}/views/"*.sql \
-              "layers/${layer}/procedures/"*.sql \
-              "layers/${layer}/"*.sql
-            # tasks last
-            list_sorted "layers/${layer}/tasks/"*.sql
+          # ---------- Phase 3: Medallion (bronze -> silver -> gold; tasks por último) ----------
+          # usa 'find' para não depender de globs; ordena por camada/tipo/nome
+          build_medallion_list () {
+            find layers -type f -name "*.sql" | awk '
+              function layer_rank(p){
+                if (p ~ /\/bronze\//) return 1;
+                if (p ~ /\/silver\//) return 2;
+                if (p ~ /\/gold\//)   return 3;
+                return 9;
+              }
+              function type_rank(p){
+                if (p ~ /\/tasks\//)       return 5;  # por último sempre
+                if (p ~ /\/ddl\//)         return 1;
+                if (p ~ /\/views\//)       return 2;
+                if (p ~ /\/procedures\//)  return 3;
+                return 4;                   # outros antes de tasks
+              }
+              { printf("%d:%d:%s\n", layer_rank($0), type_rank($0), $0) }
+            ' | sort -t: -k1,1n -k2,2n -k3,3 | cut -d: -f3- || true
           }
 
-          PHASE3_BRONZE=$(order_layer bronze)
-          PHASE3_SILVER=$(order_layer silver)
-          PHASE3_GOLD=$(order_layer gold)
-
-          for f in $PHASE3_BRONZE; do run_snowsql "DEV" "$f"; done
-          for f in $PHASE3_SILVER; do run_snowsql "DEV" "$f"; done
-          for f in $PHASE3_GOLD;   do run_snowsql "DEV" "$f"; done
+          PHASE3=$(build_medallion_list)
+          echo "Phase3 (medallion) count: $(echo "$PHASE3" | wc -w || echo 0)"
+          if [ -n "$PHASE3" ]; then
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              run_snowsql "DEV" "$f"
+            done <<< "$PHASE3"
+          fi
 
   qa:
     if: github.ref != 'refs/heads/main'
@@ -120,41 +130,36 @@ jobs:
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
           SNOWSQL_AWS_KEY_ID: ${{ secrets.SNOWSQL_AWS_KEY_ID }}
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
+        shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob globstar
 
           run_snowsql () {
             local schema="$1"; local file="$2"
-            echo "Running ${file} on schema ${schema}"
-            snowsql \
-              -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" \
-              -d "$SNOWSQL_DB" -s "$schema" \
+            echo "::group::Running ${file} on schema ${schema}"
+            snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s "$schema" \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
-              -o variable_substitution=true \
-              -o exit_on_error=true \
-              -o log_level=INFO \
+              -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
               -f "$file" \
               --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
               --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
+            echo "::endgroup::"
           }
 
-          list_sorted () { for f in "$@"; do [ -e "$f" ] && echo "$f"; done | sort; }
-          order_layer () {
-            local layer="$1"
-            list_sorted \
-              "layers/${layer}/ddl/"*.sql \
-              "layers/${layer}/views/"*.sql \
-              "layers/${layer}/procedures/"*.sql \
-              "layers/${layer}/"*.sql
-            list_sorted "layers/${layer}/tasks/"*.sql
+          list_phase () { ls -1 "$@" 2>/dev/null | sort || true; }
+          build_medallion_list () {
+            find layers -type f -name "*.sql" | awk '
+              function layer_rank(p){ if(p~/\/bronze\//)return1; if(p~/\/silver\//)return2; if(p~/\/gold\//)return3; return9 }
+              function type_rank(p){ if(p~/\/tasks\//)return5; if(p~/\/ddl\//)return1; if(p~/\/views\//)return2; if(p~/\/procedures\//)return3; return4 }
+              { printf("%d:%d:%s\n", layer_rank($0), type_rank($0), $0) }
+            ' | sort -t: -k1,1n -k2,2n -k3,3 | cut -d: -f3- || true
           }
 
-          for f in $(list_sorted migrations/database/*.sql);   do run_snowsql "QA" "$f"; done
-          for f in $(list_sorted migrations/snowflake/*.sql);  do run_snowsql "QA" "$f"; done
-          for f in $(order_layer bronze); do run_snowsql "QA" "$f"; done
-          for f in $(order_layer silver); do run_snowsql "QA" "$f"; done
-          for f in $(order_layer gold);   do run_snowsql "QA" "$f"; done
+          for f in $(list_phase migrations/database/*.sql);  do run_snowsql "QA" "$f"; done
+          for f in $(list_phase migrations/snowflake/*.sql); do run_snowsql "QA" "$f"; done
+          PHASE3=$(build_medallion_list)
+          echo "Phase3 (medallion) count: $(echo "$PHASE3" | wc -w || echo 0)"
+          if [ -n "$PHASE3" ]; then while IFS= read -r f; do [ -z "$f" ] || run_snowsql "QA" "$f"; done <<< "$PHASE3"; fi
 
   prod:
     if: github.ref == 'refs/heads/main'
@@ -181,38 +186,33 @@ jobs:
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
           SNOWSQL_AWS_KEY_ID: ${{ secrets.SNOWSQL_AWS_KEY_ID }}
           SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
+        shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob globstar
 
           run_snowsql () {
             local schema="$1"; local file="$2"
-            echo "Running ${file} on schema ${schema}"
-            snowsql \
-              -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" \
-              -d "$SNOWSQL_DB" -s "$schema" \
+            echo "::group::Running ${file} on schema ${schema}"
+            snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s "$schema" \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
-              -o variable_substitution=true \
-              -o exit_on_error=true \
-              -o log_level=INFO \
+              -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
               -f "$file" \
               --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
               --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY"
+            echo "::endgroup::"
           }
 
-          list_sorted () { for f in "$@"; do [ -e "$f" ] && echo "$f"; done | sort; }
-          order_layer () {
-            local layer="$1"
-            list_sorted \
-              "layers/${layer}/ddl/"*.sql \
-              "layers/${layer}/views/"*.sql \
-              "layers/${layer}/procedures/"*.sql \
-              "layers/${layer}/"*.sql
-            list_sorted "layers/${layer}/tasks/"*.sql
+          list_phase () { ls -1 "$@" 2>/dev/null | sort || true; }
+          build_medallion_list () {
+            find layers -type f -name "*.sql" | awk '
+              function layer_rank(p){ if(p~/\/bronze\//)return1; if(p~/\/silver\//)return2; if(p~/\/gold\//)return3; return9 }
+              function type_rank(p){ if(p~/\/tasks\//)return5; if(p~/\/ddl\//)return1; if(p~/\/views\//)return2; if(p~/\/procedures\//)return3; return4 }
+              { printf("%d:%d:%s\n", layer_rank($0), type_rank($0), $0) }
+            ' | sort -t: -k1,1n -k2,2n -k3,3 | cut -d: -f3- || true
           }
 
-          for f in $(list_sorted migrations/database/*.sql);   do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
-          for f in $(list_sorted migrations/snowflake/*.sql);  do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
-          for f in $(order_layer bronze); do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
-          for f in $(order_layer silver); do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
-          for f in $(order_layer gold);   do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $(list_phase migrations/database/*.sql);  do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          for f in $(list_phase migrations/snowflake/*.sql); do run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done
+          PHASE3=$(build_medallion_list)
+          echo "Phase3 (medallion) count: $(echo "$PHASE3" | wc -w || echo 0)"
+          if [ -n "$PHASE3" ]; then while IFS= read -r f; do [ -z "$f" ] || run_snowsql "${{ env.SCHEMA_PRD }}" "$f"; done <<< "$PHASE3"; fi
