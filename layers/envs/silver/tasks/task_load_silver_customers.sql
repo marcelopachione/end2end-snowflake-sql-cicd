@@ -1,11 +1,9 @@
-USE DATABASE snowDB;
-
 -- Task Silver
-CREATE OR REPLACE TASK snowDB.dev.task_load_silver_customers
+CREATE OR REPLACE TASK task_load_silver_customers
   WAREHOUSE = COMPUTE_WH
-  after snowDB.dev.task_load_bronze_customers
+  after task_load_bronze_customers
 AS 
-    call snowDB.dev.sp_load_silver_customers()
+    call sp_load_silver_customers()
 ;
 
 -- Enable the task

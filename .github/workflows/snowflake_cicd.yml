@@ -38,6 +38,8 @@ jobs:
           SNOWSQL_DB: ${{ secrets.SNOWSQL_DB }}
           SNOWSQL_USER: ${{ secrets.SNOWSQL_USER }}
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
+          SNOWSQL_AWS_KEY_ID: ${{ secrets.SNOWSQL_AWS_KEY_ID }}
+          SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -e
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
@@ -74,9 +76,12 @@ jobs:
               PROC_NAME=$(echo "$OUTPUT" | grep -oP 'Function \K[^ ]+' | head -1)
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema DEV"
-                snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-                  -d $SNOWSQL_DB -s DEV \
+                snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s DEV \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
+                  -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
+                  --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
+                  --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
+                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -113,6 +118,8 @@ jobs:
           SNOWSQL_DB: ${{ secrets.SNOWSQL_DB }}
           SNOWSQL_USER: ${{ secrets.SNOWSQL_USER }}
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
+          SNOWSQL_AWS_KEY_ID: ${{ secrets.SNOWSQL_AWS_KEY_ID }}
+          SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -e
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
@@ -149,9 +156,12 @@ jobs:
               PROC_NAME=$(echo "$OUTPUT" | grep -oP 'Function \K[^ ]+' | head -1)
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema QA"
-                snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-                  -d $SNOWSQL_DB -s QA \
+                snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s QA \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
+                  -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
+                  --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
+                  --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
+                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -187,6 +197,8 @@ jobs:
           SNOWSQL_DB: ${{ secrets.SNOWSQL_DB }}
           SNOWSQL_USER: ${{ secrets.SNOWSQL_USER }}
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
+          SNOWSQL_AWS_KEY_ID: ${{ secrets.SNOWSQL_AWS_KEY_ID }}
+          SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
         run: |
           set -e
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
@@ -223,9 +235,12 @@ jobs:
               PROC_NAME=$(echo "$OUTPUT" | grep -oP 'Function \K[^ ]+' | head -1)
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema ${{ env.SCHEMA_PRD }}"
-                snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-                  -d $SNOWSQL_DB -s ${{ env.SCHEMA_PRD }} \
+                snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s PRD \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
+                  -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
+                  --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
+                  --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
+                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"

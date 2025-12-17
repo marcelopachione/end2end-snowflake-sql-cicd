@@ -51,6 +51,7 @@ This project uses GitHub Actions to automate the deployment of SQL scripts to di
 
 The following secrets must be configured in your repository settings:
 - `SNOWSQL_ACCOUNT`
+- `SNOWSQL_DB`
 - `SNOWSQL_USER`
 - `SNOWSQL_PWD`
 

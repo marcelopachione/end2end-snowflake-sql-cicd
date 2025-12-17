@@ -1,4 +1,14 @@
-SELECT 
+-- Create procedure to load data from bronze_customers table to silver_customers table
+CREATE OR REPLACE PROCEDURE sp_load_silver_customers()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+    TRUNCATE TABLE silver_customers;
+
+  INSERT INTO silver_customers
+    SELECT 
         COALESCE(UPPER($1:"customer_id"::string),'N/A') as customer_id,
         COALESCE(UPPER($1:"company_name"::string),'N/A') as company_name,
         COALESCE(UPPER($1:"contact_name"::string),'N/A') as contact_name,
@@ -10,4 +20,11 @@ SELECT
         COALESCE(UPPER($1:"phone"::string),'N/A') as phone,
         COALESCE(UPPER($1:"fax"::string),'N/A') as fax,
         current_timestamp as created_at
-    FROM snowDB.dev.bronze_customers;
+    FROM bronze_customers;
+
+    RETURN 'Load Silver Customers table successfully';
+END;
+$$;
+
+-- Execute the procedure
+-- CALL sp_load_silver_customers();
