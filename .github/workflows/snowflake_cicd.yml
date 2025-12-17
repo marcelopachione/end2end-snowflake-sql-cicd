@@ -35,6 +35,7 @@ jobs:
       - name: Run changed SQL scripts on DEV
         env:
           SNOWSQL_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+          SNOWSQL_DB: ${{ secrets.SNOWSQL_DB }}
           SNOWSQL_USER: ${{ secrets.SNOWSQL_USER }}
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
         run: |
@@ -65,7 +66,7 @@ jobs:
           for file in $ORDERED_FILES; do
             echo "Running $file on schema DEV"
             OUTPUT=$(snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-              -d POC -s DEV \
+              -d $SNOWSQL_DB -s DEV \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -f $file)
             echo "$OUTPUT"
@@ -74,7 +75,7 @@ jobs:
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema DEV"
                 snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-                  -d POC -s DEV \
+                  -d $SNOWSQL_DB -s DEV \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
                   -q "CALL $PROC_NAME();"
               else
@@ -109,6 +110,7 @@ jobs:
       - name: Run changed SQL scripts on QA
         env:
           SNOWSQL_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+          SNOWSQL_DB: ${{ secrets.SNOWSQL_DB }}
           SNOWSQL_USER: ${{ secrets.SNOWSQL_USER }}
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
         run: |
@@ -139,7 +141,7 @@ jobs:
           for file in $ORDERED_FILES; do
             echo "Running $file on schema QA"
             OUTPUT=$(snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-              -d POC -s QA \
+              -d $SNOWSQL_DB -s QA \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -f $file)
             echo "$OUTPUT"
@@ -148,7 +150,7 @@ jobs:
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema QA"
                 snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-                  -d POC -s QA \
+                  -d $SNOWSQL_DB -s QA \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
                   -q "CALL $PROC_NAME();"
               else
@@ -182,6 +184,7 @@ jobs:
       - name: Run changed SQL scripts
         env:
           SNOWSQL_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+          SNOWSQL_DB: ${{ secrets.SNOWSQL_DB }}
           SNOWSQL_USER: ${{ secrets.SNOWSQL_USER }}
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
         run: |
@@ -212,7 +215,7 @@ jobs:
           for file in $ORDERED_FILES; do
             echo "Running $file on schema ${{ env.SCHEMA_PRD }}"
             OUTPUT=$(snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-              -d POC -s ${{ env.SCHEMA_PRD }} \
+              -d $SNOWSQL_DB -s ${{ env.SCHEMA_PRD }} \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -f $file)
             echo "$OUTPUT"
@@ -221,7 +224,7 @@ jobs:
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema ${{ env.SCHEMA_PRD }}"
                 snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
-                  -d POC -s ${{ env.SCHEMA_PRD }} \
+                  -d $SNOWSQL_DB -s ${{ env.SCHEMA_PRD }} \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
                   -q "CALL $PROC_NAME();"
               else
