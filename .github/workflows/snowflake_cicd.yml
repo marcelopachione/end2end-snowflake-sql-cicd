@@ -204,7 +204,7 @@ jobs:
             echo "No .sql files changed."
             exit 0
           fi
-          # Sort files by layer: bronze → silver → gold, tasks last
+          # Sort files by layer: bronze → silver → gold, tasks lasts
           ORDERED_FILES=$(echo "$MODIFIED_FILES" | while read file; do
             if [[ "$file" == *"/tasks/"* ]]; then
               echo "4:$file"
