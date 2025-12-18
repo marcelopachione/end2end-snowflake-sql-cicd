@@ -1,5 +1,3 @@
-!set variable_substitution=true
-
 -- Create procedure to load data from S3 to bronze_customers table
 CREATE OR REPLACE PROCEDURE sp_load_bronze_customers()
 RETURNS STRING
@@ -14,7 +12,7 @@ BEGIN
             CAST($1 AS VARIANT) as raw,
             metadata$filename as filename,                     
             CURRENT_TIMESTAMP() as created_at                  
-        FROM @'&{SNOWSQL_DB}'.PUBLIC.NORTH/customers (FILE_FORMAT => 'PARQUET_FORMAT');
+        FROM @SNOWSQL_DB.PUBLIC.NORTH/customers (FILE_FORMAT => 'PARQUET_FORMAT');
     RETURN 'Load Bronze Customers table successfully';
 END;
 $$;
