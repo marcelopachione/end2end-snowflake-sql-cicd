@@ -70,18 +70,21 @@ jobs:
             OUTPUT=$(snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
               -d $SNOWSQL_DB -s DEV \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
+              -o exit_on_error=true \
+              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
               -f $file)
             echo "$OUTPUT"
             if [[ "$file" == sql/procedures/* ]]; then
               PROC_NAME=$(echo "$OUTPUT" | grep -oP 'Function \K[^ ]+' | head -1)
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema DEV"
-                snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s DEV \
+                snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
+                  -d $SNOWSQL_DB -s DEV \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
-                  -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
-                  --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
-                  --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
-                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
+                  -o exit_on_error=true \
+                  -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+                  -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -150,18 +153,21 @@ jobs:
             OUTPUT=$(snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
               -d $SNOWSQL_DB -s QA \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
+              -o exit_on_error=true \
+              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
               -f $file)
             echo "$OUTPUT"
             if [[ "$file" == sql/procedures/* ]]; then
               PROC_NAME=$(echo "$OUTPUT" | grep -oP 'Function \K[^ ]+' | head -1)
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema QA"
-                snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s QA \
+                snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
+                  -d $SNOWSQL_DB -s QA \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
-                  -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
-                  --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
-                  --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
-                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
+                  -o exit_on_error=true \
+                  -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+                  -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -182,7 +188,7 @@ jobs:
 
       - name: Download and install SnowSQL via RPM
         run: |
-          wget https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.4/linux_x86_64/snowflake-snowsql-1.4.1-1.x86_64.rpm
+          wget httpsfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.4/linux_x86_64/snowflake-snowsql-1.4.1-1.x86_64.rpm
           sudo alien -i snowflake-snowsql-1.4.1-1.x86_64.rpm
 
       - name: Add SnowSQL to PATH
@@ -210,7 +216,7 @@ jobs:
             echo "No .sql files changed."
             exit 0
           fi
-          # Sort files by layer: bronze → silver → gold, tasks last
+          # Sort files by layer: bronze → silver → gold, tasks lasts
           ORDERED_FILES=$(echo "$MODIFIED_FILES" | while read file; do
             if [[ "$file" == *"/tasks/"* ]]; then
               echo "4:$file"
@@ -229,18 +235,21 @@ jobs:
             OUTPUT=$(snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
               -d $SNOWSQL_DB -s ${{ env.SCHEMA_PRD }} \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
+              -o exit_on_error=true \
+              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
               -f $file)
             echo "$OUTPUT"
             if [[ "$file" == sql/procedures/* ]]; then
               PROC_NAME=$(echo "$OUTPUT" | grep -oP 'Function \K[^ ]+' | head -1)
               if [[ -n "$PROC_NAME" ]]; then
                 echo "Calling procedure $PROC_NAME on schema ${{ env.SCHEMA_PRD }}"
-                snowsql -a "$SNOWSQL_ACCOUNT" -u "$SNOWSQL_USER" -d "$SNOWSQL_DB" -s PRD \
+                snowsql -a $SNOWSQL_ACCOUNT -u $SNOWSQL_USER \
+                  -d $SNOWSQL_DB -s ${{ env.SCHEMA_PRD }} \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
-                  -o variable_substitution=true -o exit_on_error=true -o log_level=INFO \
-                  --variable "SNOWSQL_AWS_KEY_ID=$SNOWSQL_AWS_KEY_ID" \
-                  --variable "SNOWSQL_AWS_SECRET_KEY=$SNOWSQL_AWS_SECRET_KEY" \
-                  --variable "SNOWSQL_DB=$SNOWSQL_DB" \
+                  -o exit_on_error=true \
+                  -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+                  -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"

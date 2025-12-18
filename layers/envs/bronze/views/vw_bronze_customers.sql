@@ -1,3 +1,4 @@
+CREATE VIEW IF NOT EXISTS VW_BRONZE_CUSTOMERS AS
 SELECT 
         COALESCE(UPPER($1:"customer_id"::string),'N/A') as customer_id,
         COALESCE(UPPER($1:"company_name"::string),'N/A') as company_name,
