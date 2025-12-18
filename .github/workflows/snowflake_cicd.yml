@@ -71,6 +71,8 @@ jobs:
               -d $SNOWSQL_DB -s DEV \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -o exit_on_error=true \
+              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
               -f $file)
             echo "$OUTPUT"
             if [[ "$file" == sql/procedures/* ]]; then
@@ -81,6 +83,8 @@ jobs:
                   -d $SNOWSQL_DB -s DEV \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
                   -o exit_on_error=true \
+                  -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+                  -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -150,6 +154,8 @@ jobs:
               -d $SNOWSQL_DB -s QA \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -o exit_on_error=true \
+              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
               -f $file)
             echo "$OUTPUT"
             if [[ "$file" == sql/procedures/* ]]; then
@@ -160,6 +166,8 @@ jobs:
                   -d $SNOWSQL_DB -s QA \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
                   -o exit_on_error=true \
+                  -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+                  -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
@@ -180,7 +188,7 @@ jobs:
 
       - name: Download and install SnowSQL via RPM
         run: |
-          wget https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.4/linux_x86_64/snowflake-snowsql-1.4.1-1.x86_64.rpm
+          wget httpsfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.4/linux_x86_64/snowflake-snowsql-1.4.1-1.x86_64.rpm
           sudo alien -i snowflake-snowsql-1.4.1-1.x86_64.rpm
 
       - name: Add SnowSQL to PATH
@@ -228,6 +236,8 @@ jobs:
               -d $SNOWSQL_DB -s ${{ env.SCHEMA_PRD }} \
               -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
               -o exit_on_error=true \
+              -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+              -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
               -f $file)
             echo "$OUTPUT"
             if [[ "$file" == sql/procedures/* ]]; then
@@ -238,6 +248,8 @@ jobs:
                   -d $SNOWSQL_DB -s ${{ env.SCHEMA_PRD }} \
                   -h "$SNOWSQL_ACCOUNT.snowflakecomputing.com" -p 443 \
                   -o exit_on_error=true \
+                  -D SNOWSQL_AWS_KEY_ID="$SNOWSQL_AWS_KEY_ID" \
+                  -D SNOWSQL_AWS_SECRET_KEY="$SNOWSQL_AWS_SECRET_KEY" \
                   -q "CALL $PROC_NAME();"
               else
                 echo "Could not extract the procedure name from the SnowSQL output for file $file"
