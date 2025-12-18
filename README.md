@@ -1,83 +1,81 @@
 # end2end-snowflake-sql-cicd
 
-An end-to-end ELT pipeline implemented in SQL for Snowflake. The project organizes data into layers (Bronze → Silver → Gold) using DDL, stored procedures and tasks to ingest, transform and deliver data ready for consumption.
+Short summary
+-------------
+Project for end-to-end SQL pipelines on Snowflake using Bronze/Silver/Gold layers, migrations and automated tasks. Organisation is by DDLs, stored procedures and task scripts to demonstrate an ingestion and transformation cycle suitable for CI/CD.
 
-**Highlights**
+What it is
+----------
+- SQL scripts implementing a layered pipeline (bronze → silver → gold) for Snowflake.
+- Includes DDLs, stored procedures, views and migration/task scripts.
 
-- **Goal:** Demonstrate a simple CI/CD-style data workflow for Snowflake, including raw ingestion, transformation/cleansing and dimensional modeling.
-- **Focus:** well-organized SQL by layers, automation via procedures/tasks, and DDL examples for each layer.
+Problem it solves
+-----------------
+Standardises and versions database provisioning and job workflows on Snowflake by providing a reusable set of artefacts for:
+- Provisioning objects (schemas, tables, stages)
+- Initial load and layered transformations
+- Orchestration using tasks
 
-**Architecture (summary)**
+High-level architecture
+-----------------------
+- Raw data lands in an external stage (e.g. S3/Parquet).
+- `bronze` layer: ingestion and raw records (`layers/envs/bronze`).
+- `silver` layer: cleansing and intermediate transformations (`layers/envs/silver`).
+- `gold` layer: curated models for analytics (`layers/envs/gold`).
+- Migrations and tasks in `migrations/` apply infrastructure and jobs.
 
-- **Bronze:** raw ingestion — tables that store JSON/PARQUET without transformation (`layers/bronze/ddl`).
-- **Silver:** cleaned and structured data (e.g. `layers/silver/ddl/silver_customers.sql`).
-- **Gold:** consumption-ready modeling for BI (e.g. dimensions in `layers/gold/ddl`).
+Key technologies
+----------------
+- Snowflake (SQL, Stored Procedures, Tasks)
+- File format: Parquet (see `migrations/002_file_parquet.sql`)
+- Cloud storage (e.g. S3 — `migrations/003_bucket_s3.sql`)
 
-The repository includes scripts to create the database/schema, file formats and external storage stages, plus procedures and tasks to orchestrate loads.
+How it works (quick)
+--------------------
+1. Run migration scripts to create database, schemas and stages.
+2. Create/populate Bronze tables using scripts in `layers/envs/bronze`.
+3. Run stored procedures to build Silver and Gold datasets.
+4. Schedule or trigger `tasks` in `migrations/tasks/` for automation.
 
-**Repository contents**
+Folder structure
+----------------
+- `layers/envs/bronze/` : `ddl/`, `procedures/`, `views/` for the bronze layer
+- `layers/envs/silver/` : DDLs and procedures for the silver layer
+- `layers/envs/gold/` : DDLs and procedures for the gold layer
+- `migrations/` : sequential scripts to create DB/schema/resources
+- `migrations/tasks/` : scripts to create/execute tasks (orchestration)
 
-- `database/` — scripts to create database and schema.
-- `external_storage/` — examples for configuring storage stages (S3).
-- `file_format/` — file format definitions (e.g. Parquet).
-- `layers/bronze`, `layers/silver`, `layers/gold` — DDL, procedures and tasks per layer.
+Key files
+---------
+- `migrations/000_createDB.sql` — creates the main database
+- `migrations/001_createSchema.sql` — creates schemas and initial roles
+- `layers/envs/bronze/ddl/bronze_customers.sql` — bronze table DDL
+- `layers/envs/bronze/procedures/sp_load_bronze_customers.sql` — ingestion procedure
 
-**Quick start**
+Variables / Secrets for GitHub Actions
+-------------------------------------
+To run workflows that apply migrations or invoke `snowsql` via GitHub Actions, configure the following repository secrets (Settings → Secrets & variables → Actions):
 
-1. Create the database and schema in Snowflake: run `database/createDB.sql` (and `createSchema.sql` if provided).
-2. Configure `file_format` and `external_storage` if using external files — run the SQL files in those folders.
-3. Create DDL tables by running files in `layers/*/ddl/` in the order Bronze → Silver → Gold.
-4. Review and run procedures in `layers/*/procedures/` to transform and load data.
-5. Enable or run tasks in `layers/*/tasks/` to schedule automated loads.
+- `SNOWSQL_ACCOUNT`: Snowflake account identifier (e.g. xy12345.us-east-1)
+- `SNOWSQL_USER`: user with permissions to run migrations/tasks
+- `SNOWSQL_PWD`: user credential (prefer private key when possible)
+- `SNOWSQL_DB`: target database used in migrations
+- `SNOWSQL_AWS_KEY_ID`: (if using S3 stages)
+- `SNOWSQL_AWS_SECRET_KEY`: (if using S3 stages)
 
-**CI/CD with GitHub Actions**
+Example usage in a workflow:
 
-This project uses GitHub Actions to automate the deployment of SQL scripts to different environments in Snowflake:
-
-- **DEV:** Runs scripts in the `DEV` schema on every push to any branch (except `main`).
-- **QA:** Runs scripts in the `QA` schema only after a successful deploy to DEV.
-- **PRD:** Runs scripts in the production schema (defined by the `SCHEMA_PRD` variable) after merging into the `main` branch.
-
-**Pipeline Workflow**
-
-1. **Create a development branch.**
-2. **Add or modify `.sql` files and commit/push your changes.**
-3. **The pipeline will automatically execute:**
-	- First in DEV.
-	- If DEV succeeds, then in QA.
-4. **After review, merge into `main` to trigger deployment to PRD.**
-
-**Required Secrets**
-
-The following secrets must be configured in your repository settings:
-- `SNOWSQL_ACCOUNT`
-- `SNOWSQL_DB`
-- `SNOWSQL_USER`
-- `SNOWSQL_PWD`
-
-**Running the Pipeline Manually**
-
-You can manually trigger the pipeline from the "Actions" tab in GitHub.
-
-**Adding New SQL Scripts**
-
-- Add or modify `.sql` files in your repository.
-- On commit and push, the pipeline will detect and execute only the changed `.sql` files.
-
-**Example: Triggering the Pipeline**
-
-```sh
-git checkout -b feature/my-new-view
-# Edit or add your .sql files
-git add sql/views/my_new_view.sql
-git commit -m "feat: add my new view script"
-git push origin feature/my-new-view
+```yaml
+env:
+  SNOWSQL_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+  SNOWSQL_USER: ${{ secrets.SNOWSQL_USER }}
+  SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
+  SNOWSQL_DB: ${{ secrets.SNOWSQL_DB }}
+  SNOWSQL_AWS_KEY_ID: ${{ secrets.SNOWSQL_AWS_KEY_ID }}
+  SNOWSQL_AWS_SECRET_KEY: ${{ secrets.SNOWSQL_AWS_SECRET_KEY }}
 ```
 
-Open a Pull Request to `main` when ready for production deployment.
-
-**Note:**
-
-- The pipeline ensures QA only runs after a successful DEV deploy.
-- Production deploys only occur after merging into `main`.
-- All jobs require the Snowflake secrets to be set in the repository.
+Next steps and improvements
+--------------------------
+- Infrastructure as Code (Terraform) for provisioning accounts, stages and S3 integrations.
+- Integrate dbt for modelling and data-quality tests in the Silver/Gold layers.
